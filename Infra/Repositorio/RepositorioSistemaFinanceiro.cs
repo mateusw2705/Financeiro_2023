@@ -109,6 +109,7 @@ namespace Infra.Repositorio
                     where us.EmailUsuario.Equals(emailUsuario)
                     select s).AsNoTracking().ToListAsync();
             }
+            //teste
         }
     }
 }
