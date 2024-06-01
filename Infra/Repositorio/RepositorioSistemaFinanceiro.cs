@@ -3,113 +3,88 @@ using Entities.Entidades;
 using Infra.Configuracao;
 using Infra.Repositorio.Generics;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Infra.Repositorio
+namespace Infra.Repositorio;
+
+public class RepositorioSistemaFinanceiro(
+    ContextBase context
+) : RepositoryGenerics<SistemaFinanceiro>, InterfaceSistemaFinanceiro
 {
-    public class RepositorioSistemaFinanceiro : RepositoryGenerics<SistemaFinanceiro>, InterfaceSistemaFinanceiro
+    private readonly ContextBase _context = context;
+
+    public async Task<bool> ExecuteCopiaDespesasSistemafinanceiro()
     {
+        var listaSistemasFinanceiros = new List<SistemaFinanceiro>();
 
-        private readonly DbContextOptions<ContextBase> _OptionsBuilder;
-
-        public RepositorioSistemaFinanceiro()
+        try
         {
-            _OptionsBuilder = new DbContextOptions<ContextBase>();
-        }
+            listaSistemasFinanceiros = await _context.SistemaFinanceiro
+                .Where(sistema => sistema.GerarCopiaDespesa)
+                .AsNoTracking()
+                .ToListAsync();
 
-        public async Task<bool> ExecuteCopiaDespesasSistemafinanceiro()
-        {
-            var listSistemaFinanceiro = new List<SistemaFinanceiro>();
-
-
-            try
+            foreach (var sistema in listaSistemasFinanceiros)
             {
+                var dataAtual = DateTime.Now;
+                var mesAtual = dataAtual.Month;
+                var anoAtual = dataAtual.Year;
 
-                using (var banco = new ContextBase(_OptionsBuilder))
+                var despesaJaExiste = await (
+                    from despesa in _context.Despesa
+                    join categoria in _context.Categoria on despesa.IdCategoria equals categoria.Id
+                    where categoria.IdSistema == sistema.Id
+                        && despesa.Mes == mesAtual
+                        && despesa.Ano == anoAtual
+                    select despesa.Id
+                ).AnyAsync();
+
+                if (!despesaJaExiste)
                 {
-                    listSistemaFinanceiro = await banco.SistemaFinanceiro.Where(s => s.GerarCopiaDespesa).ToListAsync();
-                }
+                    var despesasParaCopiar = await (
+                        from despesa in _context.Despesa
+                        join categoria in _context.Categoria on despesa.IdCategoria equals categoria.Id
+                        where categoria.IdSistema == sistema.Id
+                            && despesa.Mes == sistema.MesCopia
+                            && despesa.Ano == sistema.AnoCopia
+                        select despesa
+                    ).AsNoTracking().ToListAsync();
 
-
-                foreach (var item in listSistemaFinanceiro)
-                {
-
-                    using (var banco = new ContextBase(_OptionsBuilder))
+                    despesasParaCopiar.ForEach(despesa =>
                     {
+                        despesa.DataVencimento = new DateTime(anoAtual, mesAtual, despesa.DataVencimento.Day);
+                        despesa.Mes = mesAtual;
+                        despesa.Ano = anoAtual;
+                        despesa.DataAlteracao = DateTime.MinValue;
+                        despesa.DataCadastro = dataAtual;
+                        despesa.DataPagamento = DateTime.MinValue;
+                        despesa.Pago = false;
+                        despesa.Id = 0;
+                    });
 
-                        var dataatual = DateTime.Now;
-                        var mes = dataatual.Month;
-                        var ano = dataatual.Year;
-
-
-                        var despesaJaExiste = await (from d in banco.Despesa
-                                                     join c in banco.Categoria on d.IdCategoria equals c.Id
-                                                     where c.IdSistema == item.Id
-                                                     && d.Mes == mes
-                                                     && d.Ano == ano
-                                                     select d.Id).AnyAsync();
-
-
-                        if (!despesaJaExiste)
-                        {
-
-                            var despesasSistem = await (from d in banco.Despesa
-                                                        join c in banco.Categoria on d.IdCategoria equals c.Id
-                                                        where c.IdSistema == item.Id
-                                                        && d.Mes == item.MesCopia
-                                                        && d.Ano == item.AnoCopia
-                                                        select d).ToListAsync();
-
-                            despesasSistem.ForEach(d =>
-                            {
-                                d.DataVencimento = new DateTime(ano, mes, d.DataVencimento.Day);
-                                d.Mes = mes;
-                                d.Ano = ano;
-                                d.DataAlteracao = DateTime.MinValue;
-                                d.DataCadastro = dataatual;
-                                d.DataPagamento = DateTime.MinValue;
-                                d.Pago = false;
-                                d.Id = 0;
-                            });
-
-                            if (despesasSistem.Any())
-                            {
-                                banco.Despesa.AddRange(despesasSistem);
-                                await banco.SaveChangesAsync();
-                            }
-
-
-                        }
-
+                    if (despesasParaCopiar.Any())
+                    {
+                        await _context.Despesa.AddRangeAsync(despesasParaCopiar);
+                        await _context.SaveChangesAsync();
                     }
-
                 }
-
             }
-            catch (Exception)
-            {
-                return false;
-            }
-
-
-            return true;
         }
-
-        public async Task<IList<SistemaFinanceiro>> ListaSistemasUsuario(string emailUsuario)
+        catch (Exception)
         {
-            using (var banco = new ContextBase(_OptionsBuilder))
-            {
-                return await
-                   (from s in banco.SistemaFinanceiro
-                    join us in banco.UsuarioSistemaFinanceiro on s.Id equals us.IdSistema
-                    where us.EmailUsuario.Equals(emailUsuario)
-                    select s).AsNoTracking().ToListAsync();
-            }
-            //teste
+            return false;
         }
+
+        return true;
+    }
+
+    public async Task<IList<SistemaFinanceiro>> ListaSistemasUsuario(string emailUsuario)
+    {
+        var records =
+            from sistemaFinanceiro in _context.SistemaFinanceiro.AsNoTracking()
+            join usuarioSistema in _context.UsuarioSistemaFinanceiro.AsNoTracking() on sistemaFinanceiro.Id equals usuarioSistema.IdSistema
+            where usuarioSistema.EmailUsuario.Equals(emailUsuario)
+            select sistemaFinanceiro;
+
+        return await records.ToListAsync();
     }
 }

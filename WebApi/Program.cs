@@ -17,96 +17,83 @@ using WebApi.Token;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
-//builder.Services.AddControllers();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = null;
     });
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<ContextBase>(options =>
-               options.UseSqlServer(
-                   builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<ContextBase>();
 
-
-
 // INTERFACE E REPOSITORIO
-builder.Services.AddSingleton(typeof(InterfaceGeneric<>), typeof(RepositoryGenerics<>));
-builder.Services.AddSingleton<InterfaceCategoria, RepositorioCategoria>();
-builder.Services.AddSingleton<InterfaceDespesa, RepositorioDespesa>();
-builder.Services.AddSingleton<InterfaceSistemaFinanceiro, RepositorioSistemaFinanceiro>();
-builder.Services.AddSingleton<InterfaceUsuarioSistemaFinanceiro, RepositorioUsuarioSistemaFinanceiro>();
-
+builder.Services.AddScoped(typeof(InterfaceGeneric<>), typeof(RepositoryGenerics<>));
+builder.Services.AddScoped<InterfaceCategoria, RepositorioCategoria>();
+builder.Services.AddScoped<InterfaceDespesa, RepositorioDespesa>();
+builder.Services.AddScoped<InterfaceSistemaFinanceiro, RepositorioSistemaFinanceiro>();
+builder.Services.AddScoped<InterfaceUsuarioSistemaFinanceiro, RepositorioUsuarioSistemaFinanceiro>();
 
 // SERVIÇO DOMINIO
-builder.Services.AddSingleton<ICategoriaServico, CategoriaServico>();
-builder.Services.AddSingleton<IDespesaServico, DespesaServico>();
-builder.Services.AddSingleton<ISistemaFinanceiroServico, SistemaFinanceiroServico>();
-builder.Services.AddSingleton<IUsuarioSistemaFinanceiroServico, UsuarioSistemaFinanceiroServico>();
-
+builder.Services.AddScoped<ICategoriaServico, CategoriaServico>();
+builder.Services.AddScoped<IDespesaServico, DespesaServico>();
+builder.Services.AddScoped<ISistemaFinanceiroServico, SistemaFinanceiroServico>();
+builder.Services.AddScoped<IUsuarioSistemaFinanceiroServico, UsuarioSistemaFinanceiroServico>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-             .AddJwtBearer(option =>
-             {
-                 option.TokenValidationParameters = new TokenValidationParameters
-                 {
-                     ValidateIssuer = false,
-                     ValidateAudience = false,
-                     ValidateLifetime = true,
-                     ValidateIssuerSigningKey = true,
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = "Teste.Securiry.Bearer",
+            ValidAudience = "Teste.Securiry.Bearer",
+            IssuerSigningKey = JwtSecurityKey.Create("Secret_Key-12345678")
+        };
 
-                     ValidIssuer = "Teste.Securiry.Bearer",
-                     ValidAudience = "Teste.Securiry.Bearer",
-                     IssuerSigningKey = JwtSecurityKey.Create("Secret_Key-12345678")
-                 };
-
-                 option.Events = new JwtBearerEvents
-                 {
-                     OnAuthenticationFailed = context =>
-                     {
-                         Console.WriteLine("OnAuthenticationFailed: " + context.Exception.Message);
-                         return Task.CompletedTask;
-                     },
-                     OnTokenValidated = context =>
-                     {
-                         Console.WriteLine("OnTokenValidated: " + context.SecurityToken);
-                         return Task.CompletedTask;
-                     }
-                 };
-             });
-
-
-
-
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine("OnAuthenticationFailed: " + context.Exception.Message);
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine("OnTokenValidated: " + context.SecurityToken);
+                return Task.CompletedTask;
+            }
+        };
+    });
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
+if (app.Environment.IsDevelopment())
+{
     app.UseSwagger();
     app.UseSwaggerUI();
-//}
-
+}
 
 var devClient = "http://localhost:4200";
 
-app.UseCors(x =>
-x.AllowAnyOrigin()
-.AllowAnyMethod()
-.AllowAnyHeader()
-.WithOrigins(devClient));
-
+app.UseCors(options => options
+    .WithOrigins(devClient)
+    .AllowAnyOrigin()
+    .AllowAnyMethod()
+    .AllowAnyHeader());
 
 app.UseHttpsRedirection();
 
-//New
 app.UseAuthentication();
 app.UseAuthorization();
 

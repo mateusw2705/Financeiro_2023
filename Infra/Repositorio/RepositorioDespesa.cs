@@ -3,51 +3,41 @@ using Entities.Entidades;
 using Infra.Configuracao;
 using Infra.Repositorio.Generics;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Infra.Repositorio
 {
-    public class RepositorioDespesa : RepositoryGenerics<Despesa>, InterfaceDespesa
+    public class RepositorioDespesa(
+        ContextBase context
+    ) : RepositoryGenerics<Despesa>, InterfaceDespesa
     {
-
-        private readonly DbContextOptions<ContextBase> _OptionsBuilder;
-
-        public RepositorioDespesa()
-        {
-            _OptionsBuilder = new DbContextOptions<ContextBase>();
-        }
+        private readonly ContextBase _context = context;
 
         public async Task<IList<Despesa>> ListarDespesasUsuario(string emailUsuario)
         {
-            using (var banco = new ContextBase(_OptionsBuilder))
-            {
-                return await
-                   (from s in banco.SistemaFinanceiro
-                    join c in banco.Categoria on s.Id equals c.IdSistema
-                    join us in banco.UsuarioSistemaFinanceiro on s.Id equals us.IdSistema
-                    join d in banco.Despesa on c.Id equals d.IdCategoria
-                    where us.EmailUsuario.Equals(emailUsuario) && s.Mes == d.Mes && s.Ano == d.Ano
-                    select d).AsNoTracking().ToListAsync();
-            }
+            var records = from sistemaFinanceiro in _context.SistemaFinanceiro.AsNoTracking()
+                        join categoria in _context.Categoria.AsNoTracking() on sistemaFinanceiro.Id equals categoria.IdSistema
+                        join usuarioSistema in _context.UsuarioSistemaFinanceiro.AsNoTracking() on sistemaFinanceiro.Id equals usuarioSistema.IdSistema
+                        join despesa in _context.Despesa.AsNoTracking() on categoria.Id equals despesa.IdCategoria
+                        where usuarioSistema.EmailUsuario.Equals(emailUsuario)
+                              && sistemaFinanceiro.Mes == despesa.Mes
+                              && sistemaFinanceiro.Ano == despesa.Ano
+                        select despesa;
+
+            return await records.ToListAsync();
         }
 
         public async Task<IList<Despesa>> ListarDespesasUsuarioNaoPagasMesesAnterior(string emailUsuario)
         {
-            using (var banco = new ContextBase(_OptionsBuilder))
-            {
-                return await
-                   (from s in banco.SistemaFinanceiro
-                    join c in banco.Categoria on s.Id equals c.IdSistema
-                    join us in banco.UsuarioSistemaFinanceiro on s.Id equals us.IdSistema
-                    join d in banco.Despesa on c.Id equals d.IdCategoria
-                    where us.EmailUsuario.Equals(emailUsuario) && d.Mes < DateTime.Now.Month && !d.Pago
-                    select d).AsNoTracking().ToListAsync();
-            }
+            var records = from sistemaFinanceiro in _context.SistemaFinanceiro.AsNoTracking()
+                        join categoria in _context.Categoria.AsNoTracking() on sistemaFinanceiro.Id equals categoria.IdSistema
+                        join usuarioSistema in _context.UsuarioSistemaFinanceiro.AsNoTracking() on sistemaFinanceiro.Id equals usuarioSistema.IdSistema
+                        join despesa in _context.Despesa.AsNoTracking() on categoria.Id equals despesa.IdCategoria
+                        where usuarioSistema.EmailUsuario.Equals(emailUsuario)
+                              && despesa.Mes < DateTime.Now.Month
+                              && !despesa.Pago
+                        select despesa;
+
+            return await records.ToListAsync();
         }
     }
 }

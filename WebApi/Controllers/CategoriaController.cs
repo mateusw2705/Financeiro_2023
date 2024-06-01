@@ -2,7 +2,6 @@
 using Domain.Interfaces.InterfaceServicos;
 using Entities.Entidades;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace WebApi.Controllers
@@ -13,7 +12,6 @@ namespace WebApi.Controllers
     [ApiController]
     public class CategoriaController : ControllerBase
     {
-
         private readonly InterfaceCategoria _InterfaceCategoria;
         private readonly ICategoriaServico _ICategoriaServico;
 

@@ -17,6 +17,5 @@ namespace Entities.Entidades
         public bool GerarCopiaDespesa { get; set; }
         public int MesCopia { get; set; }
         public int AnoCopia { get; set; }
-
     }
 }
